@@ -200,28 +200,46 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
             ),
           ),
         ),
-        BottomActionBar(
-          label: _checkInCompleted ? 'Checked in' : 'Total amount',
-          value: Formatters.currency.format(_total),
-          actionLabel: _currentStep != 2
-              ? 'Continue'
-              : _isCompleting
-              ? 'Completing…'
-              : _checkInCompleted
-              ? 'Checked in'
-              : 'Complete check-in',
-          actionIcon: _currentStep == 2
-              ? (_checkInCompleted
-                    ? Icons.check_circle_rounded
-                    : Icons.how_to_reg_rounded)
-              : null,
-          completed: _currentStep == 2 && _checkInCompleted,
-          enabled: !_isCompleting && !(_currentStep == 2 && _checkInCompleted),
-          onAction: _currentStep == 2
-              ? _completeCheckIn
-              : () => _goToStep(_currentStep + 1),
-        ),
+        if (_checkInCompleted)
+          _checkInCompleteFooter()
+        else
+          BottomActionBar(
+            label: 'Total amount',
+            value: Formatters.currency.format(_total),
+            actionLabel: _currentStep != 2
+                ? 'Continue'
+                : _isCompleting
+                ? 'Completing…'
+                : 'Complete check-in',
+            actionIcon: _currentStep == 2 ? Icons.how_to_reg_rounded : null,
+            enabled: !_isCompleting,
+            onAction: _currentStep == 2
+                ? _completeCheckIn
+                : () => _goToStep(_currentStep + 1),
+          ),
       ],
+    );
+  }
+
+  Widget _checkInCompleteFooter() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: FilledButton.icon(
+        onPressed: null,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.successDark,
+          disabledBackgroundColor: AppColors.successDark,
+          disabledForegroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 44),
+        ),
+        icon: const Icon(Icons.check_circle_rounded, size: 18),
+        label: const Text('Check in complete'),
+      ),
     );
   }
 
@@ -622,7 +640,10 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
               compact: true,
               onAction: () {
                 _searchController.clear();
-                setState(() => _searchError = null);
+                setState(() {
+                  _searchError = null;
+                  _checkInCompleted = false;
+                });
               },
             )
           : Column(

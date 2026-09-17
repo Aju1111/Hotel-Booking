@@ -75,7 +75,7 @@ void main() {
     expect(find.text('Completing…'), findsWidgets);
     await tester.pumpAndSettle();
 
-    expect(find.text('Checked in'), findsWidgets);
+    expect(find.text('Check in complete'), findsOneWidget);
     expect(find.text('Complete check-in'), findsNothing);
 
     await _openTab(tester, 'Check-out');
