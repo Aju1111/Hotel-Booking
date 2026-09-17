@@ -25,11 +25,11 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
   static const _steps = ['Find guest', 'Review details', 'Payment'];
 
   final _searchController = TextEditingController();
-  final _rentController = TextEditingController(text: '1200');
-  final _gstController = TextEditingController(text: '12');
-  final _adultsController = TextEditingController(text: '02');
+  final _rentController = TextEditingController(text: '0');
+  final _gstController = TextEditingController(text: '0');
+  final _adultsController = TextEditingController(text: '00');
   final _kidsController = TextEditingController(text: '00');
-  final _guestNameController = TextEditingController(text: 'Mathew Hyden');
+  final _guestNameController = TextEditingController();
 
   int _currentStep = 0;
   String? _selectedGuest;
@@ -75,7 +75,27 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
       (_roomCharge + _extraCharges) *
       (double.tryParse(_gstController.text) ?? 0) /
       100;
-  double get _total => _roomCharge + _extraCharges + _tax;
+  bool get _hasActiveGuest => _activeRecord != null;
+
+  double get _total {
+    if (!_hasActiveGuest) return 0;
+    return _roomCharge + _extraCharges + _tax;
+  }
+
+  void _clearGuestSelection() {
+    _activeRecord = null;
+    _selectedGuest = null;
+    _currentStep = 0;
+    _checkInCompleted = false;
+    _searchError = null;
+    _nameError = null;
+    _guestNameController.clear();
+    _rentController.text = '0';
+    _gstController.text = '0';
+    _adultsController.text = '00';
+    _kidsController.text = '00';
+    _idProofName = null;
+  }
 
   Future<void> _findGuest() async {
     setState(() {
@@ -90,7 +110,7 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
     setState(() {
       _isSearching = false;
       if (records.isEmpty) {
-        _activeRecord = null;
+        _clearGuestSelection();
         _searchError = 'No booking matches "${_searchController.text.trim()}".';
       } else {
         _applyRecord(records.first);
@@ -212,7 +232,7 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
                 ? 'Completing…'
                 : 'Complete check-in',
             actionIcon: _currentStep == 2 ? Icons.how_to_reg_rounded : null,
-            enabled: !_isCompleting,
+            enabled: !_isCompleting && _hasActiveGuest,
             onAction: _currentStep == 2
                 ? _completeCheckIn
                 : () => _goToStep(_currentStep + 1),
@@ -325,8 +345,8 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
                   lastDate: DateTime(2030),
                   onPick: (date) => setState(() {
                     _bookingDate = date;
-                    _activeRecord = null;
                     _searchError = null;
+                    _clearGuestSelection();
                   }),
                 ),
               ),
@@ -641,8 +661,7 @@ class _GuestCheckinScreenState extends State<GuestCheckinScreen> {
               onAction: () {
                 _searchController.clear();
                 setState(() {
-                  _searchError = null;
-                  _checkInCompleted = false;
+                  _clearGuestSelection();
                 });
               },
             )

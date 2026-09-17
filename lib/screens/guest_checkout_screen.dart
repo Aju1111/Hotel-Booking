@@ -25,6 +25,8 @@ class GuestCheckoutScreen extends StatefulWidget {
 class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
   static const _steps = ['Identify', 'Review bill', 'Payment'];
   static const _paymentMethods = ['Credit Card', 'Cash', 'M-Pay'];
+  static const _standardExtraCharge = 200.0;
+  static const _gstPercent = 12.0;
 
   final _roomSearchController = TextEditingController(text: '101');
   final _paymentController = TextEditingController();
@@ -34,6 +36,7 @@ class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
   String _paymentMethod = 'Credit Card';
   DateTime _checkInDate = Formatters.today;
   TimeOfDay _checkInTime = const TimeOfDay(hour: 19, minute: 0);
+  TimeOfDay _checkoutTime = const TimeOfDay(hour: 11, minute: 0);
   List<CheckoutRoom> _rooms = [];
 
   /// Charges added from this screen, keyed by room number.
@@ -82,9 +85,19 @@ class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
     ...?_addedCharges[room.roomNumber],
   ];
 
+  double _roomChargeFor(CheckoutRoom room) => room.roomTotal;
+
+  double _taxFor(CheckoutRoom room) =>
+      (_roomChargeFor(room) + _standardExtraCharge) * _gstPercent / 100;
+
+  double _folioChargesFor(CheckoutRoom room) =>
+      _chargesFor(room).fold<double>(0, (sum, charge) => sum + charge.amount);
+
   double _totalFor(CheckoutRoom room) =>
-      room.roomTotal +
-      _chargesFor(room).fold<double>(0, (sum, c) => sum + c.amount);
+      _roomChargeFor(room) +
+      _standardExtraCharge +
+      _taxFor(room) +
+      _folioChargesFor(room);
 
   List<CheckoutRoom> get _selectedRooms =>
       _rooms.where((room) => room.selectedForCheckout).toList();
@@ -567,8 +580,13 @@ class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
             padding: const EdgeInsets.only(bottom: 12),
             child: _RoomBillPanel(
               room: room,
+              checkInTime: _checkInTime,
+              checkoutTime: _checkoutTime,
               charges: _chargesFor(room),
               total: _totalFor(room),
+              roomCharge: _roomChargeFor(room),
+              extraCharge: _standardExtraCharge,
+              taxCharge: _taxFor(room),
               selectedExtras: {
                 for (final charge in _addedCharges[room.roomNumber] ?? [])
                   charge.description,
@@ -616,6 +634,41 @@ class _GuestCheckoutScreenState extends State<GuestCheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_selectedRooms.isNotEmpty) ...[
+            for (final room in _selectedRooms) ...[
+              Text(
+                'Room ${room.roomNumber}',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 6),
+              _StayChargeSummary(
+                checkInTime: _checkInTime,
+                checkoutTime: _checkoutTime,
+                roomCharge: _roomChargeFor(room),
+                extraCharge: _standardExtraCharge,
+                taxCharge: _taxFor(room),
+                folioCharges: _folioChargesFor(room),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Divider(),
+            ),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: CompactTimeField(
+                  label: 'Check-out time',
+                  value: _checkoutTime,
+                  enabled: !_checkOutCompleted,
+                  onPick: (time) => setState(() => _checkoutTime = time),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -914,11 +967,75 @@ class _RoomSelectRow extends StatelessWidget {
   }
 }
 
+class _StayChargeSummary extends StatelessWidget {
+  const _StayChargeSummary({
+    required this.checkInTime,
+    required this.checkoutTime,
+    required this.roomCharge,
+    required this.extraCharge,
+    required this.taxCharge,
+    required this.folioCharges,
+  });
+
+  final TimeOfDay checkInTime;
+  final TimeOfDay checkoutTime;
+  final double roomCharge;
+  final double extraCharge;
+  final double taxCharge;
+  final double folioCharges;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _AmountLine(
+            label: 'Check-in time',
+            value: Formatters.formatTime(checkInTime),
+          ),
+          _AmountLine(
+            label: 'Check-out time',
+            value: Formatters.formatTime(checkoutTime),
+          ),
+          _AmountLine(
+            label: 'Room charge',
+            value: Formatters.currency.format(roomCharge),
+          ),
+          _AmountLine(
+            label: 'Extra charges',
+            value: Formatters.currency.format(extraCharge),
+          ),
+          _AmountLine(
+            label: 'Tax (GST)',
+            value: Formatters.currency.format(taxCharge),
+          ),
+          if (folioCharges > 0)
+            _AmountLine(
+              label: 'Folio add-ons',
+              value: Formatters.currency.format(folioCharges),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RoomBillPanel extends StatelessWidget {
   const _RoomBillPanel({
     required this.room,
+    required this.checkInTime,
+    required this.checkoutTime,
     required this.charges,
     required this.total,
+    required this.roomCharge,
+    required this.extraCharge,
+    required this.taxCharge,
     required this.selectedExtras,
     required this.onToggleCharge,
     required this.onPrint,
@@ -926,8 +1043,13 @@ class _RoomBillPanel extends StatelessWidget {
   });
 
   final CheckoutRoom room;
+  final TimeOfDay checkInTime;
+  final TimeOfDay checkoutTime;
   final List<RoomCharge> charges;
   final double total;
+  final double roomCharge;
+  final double extraCharge;
+  final double taxCharge;
   final Set<String> selectedExtras;
   final void Function(String description, double amount) onToggleCharge;
   final VoidCallback onPrint;
@@ -953,6 +1075,18 @@ class _RoomBillPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _StayChargeSummary(
+            checkInTime: checkInTime,
+            checkoutTime: checkoutTime,
+            roomCharge: roomCharge,
+            extraCharge: extraCharge,
+            taxCharge: taxCharge,
+            folioCharges: charges.fold<double>(
+              0,
+              (sum, charge) => sum + charge.amount,
+            ),
+          ),
+          const SizedBox(height: 14),
           Text('Add items', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           Wrap(
@@ -1054,6 +1188,41 @@ class _RoomBillPanel extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmountLine extends StatelessWidget {
+  const _AmountLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall,
           ),
         ],
       ),

@@ -1,4 +1,4 @@
-# Raintech Hotel Booking App
+# Hotel Booking App
 
 Flutter app for the Raintech Hotel coding assessment, extended with a mobile-first
 front-desk UI (dashboard, check-in, check-out, rooms, reports, profile).
