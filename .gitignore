@@ -1,3 +1,6 @@
+# Cursor IDE (local only — not part of the project)
+.cursor/
+
 # Miscellaneous
 *.class
 *.log
